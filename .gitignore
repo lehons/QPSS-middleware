@@ -1,0 +1,39 @@
+# ─── Credentials (NEVER commit) ───
+config.ini
+
+# ─── Runtime data ───
+QuikPAK/
+logs/
+flow2_state.json
+
+# ─── Python ───
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ─── IDE / editor ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS files ───
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ─── Generated docs / tooling (not part of the software) ───
+QPSS_Middleware_SOPs.docx
+create_sop_doc.py
+
+# ─── Old planning docs (not part of the software) ───
+RUNNING_THE_FLOWS.md
+OPEN_ITEMS.md
+PROTOTYPE_PLAN.md
+QUESTIONS.md

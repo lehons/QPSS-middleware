@@ -1,0 +1,72 @@
+; ─────────────────────────────────────────────────────────────
+; QPSS Middleware Configuration
+; ─────────────────────────────────────────────────────────────
+; Copy this file to config.ini and fill in your actual values.
+;
+;   copy config.ini.example config.ini
+;
+; IMPORTANT: config.ini contains credentials and is excluded
+; from version control via .gitignore. NEVER commit config.ini.
+; ─────────────────────────────────────────────────────────────
+
+[paths]
+; All paths must be absolute. Adjust to match your deployment location.
+quikpak_in = C:\QPSS\QuikPAK\QuikPAKIN
+quikpak_in_processed = C:\QPSS\QuikPAK\QuikPAKIN\Processed
+quikpak_in_error = C:\QPSS\QuikPAK\QuikPAKIN\Error
+quikpak_out = C:\QPSS\QuikPAK\QuikPAKOUT
+quikpak_pending = C:\QPSS\QuikPAK\Pending
+log_dir = C:\QPSS\logs
+
+; ─── US ShipStation Account ───
+; Orders shipping to non-CA destinations are routed here.
+; API keys are generated in ShipStation > Settings > API Settings.
+; Keys expire annually — see README for renewal instructions.
+[shipstation]
+api_key = YOUR_US_API_KEY
+api_secret = YOUR_US_API_SECRET
+store_id = YOUR_US_STORE_ID
+base_url = https://ssapi.shipstation.com
+
+; ─── Canadian ShipStation Account ───
+; Orders shipping to CA destinations are routed here.
+; To find the store_id, run: python qpss_middleware.py --list-stores --account ca
+[shipstation_ca]
+api_key = YOUR_CA_API_KEY
+api_secret = YOUR_CA_API_SECRET
+store_id = YOUR_CA_STORE_ID
+base_url = https://ssapi.shipstation.com
+
+; ─── Sage 300 ERP Database ───
+; Used to look up order line items (SKU, description, qty) for ShipStation packing slips.
+; The XML orderno field (e.g., ORD0469657) maps to dbo.OEORDH.ORDNUMBER.
+[sage300]
+server = YOUR_SQL_SERVER
+database = YOUR_DATABASE
+; Authentication: leave username blank to use Windows auth (Trusted_Connection).
+; Set username + password for SQL Server authentication.
+username =
+password =
+odbc_driver = ODBC Driver 17 for SQL Server
+
+[settings]
+retry_attempts = 3
+retry_delay_seconds = 5
+; Flow 2 state file tracks last poll time and processed shipments.
+; If blank, defaults to flow2_state.json in the script directory.
+flow2_state_file =
+
+[ship_from]
+; US warehouse / ship-from address (used in OUT XML ship-from fields).
+name =
+addr1 =
+addr2 =
+addr3 =
+addr4 =
+city =
+state =
+zip =
+country = US
+contact =
+phone =
+account_no =
