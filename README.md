@@ -94,6 +94,20 @@ python qpss_middleware.py --list-stores --account ca  # CA account
 
 Double-click any batch file to run it. They automatically set the working directory, so **you can rename them or create shortcuts to them anywhere** — they will still work because they use `cd /d "%~dp0"` to find the script directory.
 
+### Remote Execution (from client machines)
+
+The `remote\` folder contains batch files that run the middleware on the app server (IS-APP-19) via PowerShell Remoting, so operators don't need to RDP into the server.
+
+| Batch File | What It Does |
+|------------|-------------|
+| `remote\Push Orders to ShipStation (Remote).bat` | Runs Flow 1 on IS-APP-19 |
+| `remote\Query Shipments from ShipStation (Remote).bat` | Runs Flow 2 on IS-APP-19 |
+| `remote\Cleanup Pending Orders (Remote).bat` | Runs `--cleanup-pending` on IS-APP-19 |
+
+**Requirements:** WinRM must be running on IS-APP-19 (already configured). The user's domain account must have remote execution permission. No Python or other software needs to be installed on the client machine.
+
+These batch files can be placed anywhere on the client machine — copy the entire `remote\` folder to a convenient location (e.g., desktop) or create shortcuts to the individual .bat files.
+
 ### Command Line
 
 ```bash
@@ -154,6 +168,11 @@ Prototype/
 ├── tools/                      # Dev / test utilities
 │   ├── generate_test.py        # Test XML file generator
 │   └── generate_test.bat       # Batch wrapper for test generator
+├── remote/                     # Remote execution scripts (for client machines)
+│   ├── run_remote.ps1          # PowerShell remoting core script
+│   ├── Push Orders to ShipStation (Remote).bat
+│   ├── Query Shipments from ShipStation (Remote).bat
+│   └── Cleanup Pending Orders (Remote).bat
 ├── QuikPAK/                    # Runtime XML folders (NOT in git)
 │   ├── QuikPAKIN/              # Incoming XML from QuikPAK
 │   │   ├── Processed/          # Successfully processed files
