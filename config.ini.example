@@ -55,18 +55,3 @@ retry_delay_seconds = 5
 ; Flow 2 state file tracks last poll time and processed shipments.
 ; If blank, defaults to flow2_state.json in the script directory.
 flow2_state_file =
-
-[ship_from]
-; US warehouse / ship-from address (used in OUT XML ship-from fields).
-name =
-addr1 =
-addr2 =
-addr3 =
-addr4 =
-city =
-state =
-zip =
-country = US
-contact =
-phone =
-account_no =

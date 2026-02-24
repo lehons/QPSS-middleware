@@ -589,23 +589,6 @@ def _save_flow2_state(state_path: str, state: dict) -> None:
         json.dump(state, f, indent=2)
 
 
-def _get_ship_from_config(config: configparser.ConfigParser) -> dict:
-    """Read the [ship_from] section into a dict for the XML generator."""
-    return {
-        "name": config.get("ship_from", "name", fallback=""),
-        "addr1": config.get("ship_from", "addr1", fallback=""),
-        "addr2": config.get("ship_from", "addr2", fallback=""),
-        "addr3": config.get("ship_from", "addr3", fallback=""),
-        "addr4": config.get("ship_from", "addr4", fallback=""),
-        "city": config.get("ship_from", "city", fallback=""),
-        "state": config.get("ship_from", "state", fallback=""),
-        "zip": config.get("ship_from", "zip", fallback=""),
-        "country": config.get("ship_from", "country", fallback=""),
-        "contact": config.get("ship_from", "contact", fallback=""),
-        "phone": config.get("ship_from", "phone", fallback=""),
-        "account_no": config.get("ship_from", "account_no", fallback=""),
-    }
-
 
 def _is_our_order(order_number: str) -> bool:
     """Check if an orderNumber matches our format: customercode_ShipmentID.
@@ -648,8 +631,6 @@ def run_flow2(config: configparser.ConfigParser, dry_run: bool = False) -> None:
     if not state_path:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         state_path = os.path.join(script_dir, "flow2_state.json")
-
-    ship_from = _get_ship_from_config(config)
 
     # Load state
     state = _load_flow2_state(state_path)
@@ -775,7 +756,6 @@ def run_flow2(config: configparser.ConfigParser, dry_run: bool = False) -> None:
                 pending=pending,
                 shipment=shipment,
                 out_folder=out_folder,
-                ship_from=ship_from,
             )
             logger.info(f"{shipment_id} | SUCCESS: Generated OUT files")
             logger.info(f"{shipment_id} |   {os.path.basename(header_path)}")

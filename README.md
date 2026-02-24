@@ -63,7 +63,6 @@ Copy `config.ini.example` to `config.ini` and fill in all values. The file is ex
 | `[shipstation_ca]` | Canadian account API key, secret, store ID |
 | `[sage300]` | SQL Server hostname, database name, credentials, ODBC driver |
 | `[settings]` | Retry attempts, delay, Flow 2 state file location |
-| `[ship_from]` | Warehouse ship-from address (used in OUT XML) |
 
 ### ShipStation API Keys
 

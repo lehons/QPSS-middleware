@@ -21,7 +21,6 @@ def generate_out_files(
     pending: dict,
     shipment: dict,
     out_folder: str,
-    ship_from: dict,
 ) -> tuple[str, str]:
     """Generate HEADEROUT and DETAILOUT XML files for a completed shipment.
 
@@ -30,9 +29,9 @@ def generate_out_files(
             saved during Flow 1). Contains: shipment_id, order_number,
             ship_to, ship_via, is_cod, coll_type, packages, etc.
         shipment: ShipStation shipment dict from GET /shipments.
-            Provides: trackingNumber, carrierCode, serviceCode, shipDate.
+            Provides: trackingNumber, carrierCode, serviceCode, shipDate,
+            shipFrom (warehouse address).
         out_folder: Path to QuikPAKOUT folder.
-        ship_from: Dict with ship-from warehouse fields from config.
 
     Returns:
         Tuple of (header_path, detail_path) for the written files.
@@ -50,7 +49,6 @@ def generate_out_files(
         order_number=order_number,
         pending=pending,
         shipment=shipment,
-        ship_from=ship_from,
     )
     header_filename = f"HEADEROUT_{shipment_id}_{timestamp}.XML"
     header_path = os.path.join(out_folder, header_filename)
@@ -78,7 +76,6 @@ def _build_header_out(
     order_number: str,
     pending: dict,
     shipment: dict,
-    ship_from: dict,
 ) -> Element:
     """Build the SmartlincOutHeader XML element tree."""
     root = Element("SmartlincOutHeader")
@@ -142,19 +139,20 @@ def _build_header_out(
     _add(hdr, "tpContact", "")
     _add(hdr, "tpPhone", "")
 
-    # Ship-from fields (from warehouse config)
-    _add(hdr, "SFACCOUNTNO", ship_from.get("account_no", ""))
-    _add(hdr, "sfName", ship_from.get("name", ""))
-    _add(hdr, "sfAddr1", ship_from.get("addr1", ""))
-    _add(hdr, "sfAddr2", ship_from.get("addr2", ""))
-    _add(hdr, "sfAddr3", ship_from.get("addr3", ""))
-    _add(hdr, "sfAddr4", ship_from.get("addr4", ""))
-    _add(hdr, "sfCity", ship_from.get("city", ""))
-    _add(hdr, "sfState", ship_from.get("state", ""))
-    _add(hdr, "sfZip", ship_from.get("zip", ""))
-    _add(hdr, "sfCountry", ship_from.get("country", ""))
-    _add(hdr, "sfContact", ship_from.get("contact", ""))
-    _add(hdr, "sfPhone", ship_from.get("phone", ""))
+    # Ship-from fields (from ShipStation shipment data)
+    sf = shipment.get("shipFrom") or {}
+    _add(hdr, "SFACCOUNTNO", "")
+    _add(hdr, "sfName", sf.get("company", "") or sf.get("name", ""))
+    _add(hdr, "sfAddr1", sf.get("street1", ""))
+    _add(hdr, "sfAddr2", sf.get("street2", ""))
+    _add(hdr, "sfAddr3", sf.get("street3", ""))
+    _add(hdr, "sfAddr4", "")
+    _add(hdr, "sfCity", sf.get("city", ""))
+    _add(hdr, "sfState", sf.get("state", ""))
+    _add(hdr, "sfZip", sf.get("postalCode", ""))
+    _add(hdr, "sfCountry", sf.get("country", ""))
+    _add(hdr, "sfContact", sf.get("name", ""))
+    _add(hdr, "sfPhone", sf.get("phone", ""))
 
     return root
 
