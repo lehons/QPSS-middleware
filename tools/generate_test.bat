@@ -19,7 +19,7 @@ REM    run_flow1.bat  or  run_flow1_dryrun.bat
 REM ──────────────────────────────────────────────────────────────
 
 cd /d "%~dp0"
-python generate_test.py %*
+python "%~dp0generate_test.py" %*
 if errorlevel 1 (
     echo.
     echo ERROR: Test generation failed.

@@ -90,7 +90,7 @@ python qpss_middleware.py --list-stores --account ca  # CA account
 |------------|-------------|
 | `Push Orders to ShipStation.bat` | Runs Flow 1 — reads XML IN files, creates ShipStation orders |
 | `Query Shipments from ShipStation.bat` | Runs Flow 2 — polls for shipped orders, generates XML OUT files |
-| `generate_test.bat` | Generates test XML file pairs for Flow 1 testing |
+| `tools\generate_test.bat` | Generates test XML file pairs for Flow 1 testing |
 
 Double-click any batch file to run it. They automatically set the working directory, so **you can rename them or create shortcuts to them anywhere** — they will still work because they use `cd /d "%~dp0"` to find the script directory.
 
@@ -110,11 +110,11 @@ python qpss_middleware.py --list-stores              # show US stores
 python qpss_middleware.py --list-stores --account ca  # show CA stores
 python qpss_middleware.py --cleanup-pending 90        # remove orphaned pending JSONs > 90 days
 
-# Test file generation
-python generate_test.py                              # generate with defaults
-python generate_test.py --orderno ORD0469657         # override order number
-python generate_test.py --country CA --state QC      # ship to Canada
-python generate_test.py --help                       # show all options
+# Test file generation (from project root)
+python tools\generate_test.py                              # generate with defaults
+python tools\generate_test.py --orderno ORD0469657         # override order number
+python tools\generate_test.py --country CA --state QC      # ship to Canada
+python tools\generate_test.py --help                       # show all options
 ```
 
 ### Dry Run Mode
@@ -134,13 +134,12 @@ Prototype/
 ├── qpss_middleware.py          # Main entry point (both flows + utilities)
 ├── config.ini                  # Your credentials and paths (NOT in git)
 ├── config.ini.example          # Template for config.ini
-├── generate_test.py            # Test XML file generator
-├── generate_test.bat           # Batch wrapper for test generator
-├── Push Orders to ShipStation.bat      # Flow 1 launcher
-├── Query Shipments from ShipStation.bat # Flow 2 launcher
 ├── requirements.txt            # Python dependencies
 ├── flow2_state.json            # Flow 2 runtime state (NOT in git)
-├── src/
+├── Push Orders to ShipStation.bat      # Flow 1 launcher
+├── Query Shipments from ShipStation.bat # Flow 2 launcher
+├── README.md
+├── src/                        # Source modules
 │   ├── __init__.py
 │   ├── file_manager.py         # XML file scanning, pairing, moving
 │   ├── logger.py               # Daily rotating log setup
@@ -149,6 +148,12 @@ Prototype/
 │   ├── shipstation_client.py   # ShipStation V1 API client
 │   ├── xml_generator.py        # OUT XML file generation
 │   └── xml_parser.py           # IN XML file parsing
+├── docs/                       # Documentation
+│   ├── ARCHITECTURE.md         # Technical architecture reference
+│   └── CHANGELOG.md            # Version history
+├── tools/                      # Dev / test utilities
+│   ├── generate_test.py        # Test XML file generator
+│   └── generate_test.bat       # Batch wrapper for test generator
 ├── QuikPAK/                    # Runtime XML folders (NOT in git)
 │   ├── QuikPAKIN/              # Incoming XML from QuikPAK
 │   │   ├── Processed/          # Successfully processed files

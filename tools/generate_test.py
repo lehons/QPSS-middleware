@@ -241,6 +241,7 @@ def main():
 
     # Locate QuikPAKIN folder
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)  # tools/ -> Prototype/
 
     if args.config:
         import configparser
@@ -248,15 +249,15 @@ def main():
         config.read(args.config, encoding="utf-8")
         quikpak_in = config.get("paths", "quikpak_in")
     else:
-        # Try config.ini in script dir, fall back to default location
-        config_path = os.path.join(script_dir, "config.ini")
+        # Try config.ini in project root, fall back to default location
+        config_path = os.path.join(project_root, "config.ini")
         if os.path.exists(config_path):
             import configparser
             config = configparser.ConfigParser()
             config.read(config_path, encoding="utf-8")
             quikpak_in = config.get("paths", "quikpak_in")
         else:
-            quikpak_in = os.path.join(script_dir, "QuikPAK", "QuikPAKIN")
+            quikpak_in = os.path.join(project_root, "QuikPAK", "QuikPAKIN")
 
     if not os.path.isdir(quikpak_in):
         print(f"ERROR: QuikPAKIN folder not found: {quikpak_in}")

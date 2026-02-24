@@ -28,12 +28,9 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# ─── Generated docs / tooling (not part of the software) ───
-QPSS_Middleware_SOPs.docx
-create_sop_doc.py
+# ─── Generated docs (not part of the software) ───
+docs/QPSS_Middleware_SOPs.docx
+docs/create_sop_doc.py
 
-# ─── Old planning docs (not part of the software) ───
-RUNNING_THE_FLOWS.md
-OPEN_ITEMS.md
-PROTOTYPE_PLAN.md
-QUESTIONS.md
+# ─── Archive (old planning docs, moved to Asana) ───
+_archive/
