@@ -82,16 +82,17 @@ class ShipStationClient:
             return None
 
     def list_shipments(self, store_id: int = None,
-                        ship_date_start: str = None,
-                        ship_date_end: str = None,
+                        create_date_start: str = None,
+                        create_date_end: str = None,
                         page: int = 1,
                         page_size: int = 100) -> dict:
         """List shipments from ShipStation.
 
         Args:
             store_id: Filter by store (integer ID).
-            ship_date_start: ISO date string (YYYY-MM-DD) for start of range.
-            ship_date_end: ISO date string (YYYY-MM-DD) for end of range.
+            create_date_start: ISO date string (YYYY-MM-DD). Filters by when the
+                shipment record was created (label generated), not the order date.
+            create_date_end: ISO date string (YYYY-MM-DD) for end of range.
             page: Page number (1-based).
             page_size: Results per page (max 500).
 
@@ -101,10 +102,10 @@ class ShipStationClient:
         params = {"page": page, "pageSize": page_size}
         if store_id is not None:
             params["storeId"] = store_id
-        if ship_date_start:
-            params["shipDateStart"] = ship_date_start
-        if ship_date_end:
-            params["shipDateEnd"] = ship_date_end
+        if create_date_start:
+            params["createDateStart"] = create_date_start
+        if create_date_end:
+            params["createDateEnd"] = create_date_end
         return self._get_with_retry(url, params)
 
     def get_order(self, order_id: int) -> dict:

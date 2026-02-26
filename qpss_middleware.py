@@ -636,15 +636,16 @@ def run_flow2(config: configparser.ConfigParser, dry_run: bool = False) -> None:
     state = _load_flow2_state(state_path)
     processed_ids = set(state.get("processed_shipment_ids", []))
 
-    # Determine date range for polling
+    # Determine date range for polling (based on shipment creation date,
+    # i.e. when the label was generated — not the original order date)
     last_poll = state.get("last_poll_date")
     if last_poll:
         start_date = last_poll
-        logger.info(f"Polling shipments from {start_date} (last poll date)")
+        logger.info(f"Polling shipments created from {start_date} (last poll date)")
     else:
         # First run: look back 7 days
         start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        logger.info(f"First run — polling shipments from {start_date} (last 7 days)")
+        logger.info(f"First run — polling shipments created from {start_date} (last 7 days)")
 
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -666,7 +667,7 @@ def run_flow2(config: configparser.ConfigParser, dry_run: bool = False) -> None:
             try:
                 result = client.list_shipments(
                     store_id=store_id,
-                    ship_date_start=start_date,
+                    create_date_start=start_date,
                     page=page,
                     page_size=100,
                 )
