@@ -21,6 +21,7 @@ def generate_out_files(
     pending: dict,
     shipment: dict,
     out_folder: str,
+    package_tracking: list[str] | None = None,
 ) -> tuple[str, str]:
     """Generate HEADEROUT and DETAILOUT XML files for a completed shipment.
 
@@ -32,6 +33,9 @@ def generate_out_files(
             Provides: trackingNumber, carrierCode, serviceCode, shipDate,
             shipFrom (warehouse address).
         out_folder: Path to QuikPAKOUT folder.
+        package_tracking: Optional list of per-package tracking numbers
+            (from UPS API). If provided and length matches package count,
+            each DetailLine gets its own tracking number positionally.
 
     Returns:
         Tuple of (header_path, detail_path) for the written files.
@@ -59,6 +63,7 @@ def generate_out_files(
         order_number=order_number,
         shipment=shipment,
         packages=pending.get("packages", []),
+        package_tracking=package_tracking,
     )
     detail_filename = f"DETAILOUT_{shipment_id}_{timestamp}.XML"
     detail_path = os.path.join(out_folder, detail_filename)
@@ -162,18 +167,31 @@ def _build_detail_out(
     order_number: str,
     shipment: dict,
     packages: list[dict],
+    package_tracking: list[str] | None = None,
 ) -> Element:
     """Build the SmartlincOutDetail XML element tree.
 
     Uses original package data from the pending JSON.
     If packages list is empty, generates a single minimal DetailLine
     from shipment-level data (fallback for legacy orders without pending data).
+
+    If package_tracking is provided and has the right count, each DetailLine
+    gets its own tracking number positionally. Otherwise falls back to the
+    master tracking number on all lines.
     """
     root = Element("SmartlincOutDetail")
     tracking = shipment.get("trackingNumber", "")
 
+    # Use per-package tracking only if we have exactly the right count
+    use_per_pkg = (
+        package_tracking
+        and packages
+        and len(package_tracking) >= len(packages)
+    )
+
     if packages:
-        for pkg in packages:
+        for i, pkg in enumerate(packages):
+            pkg_tracking = package_tracking[i] if use_per_pkg else tracking
             line = SubElement(root, "DetailLine")
             _add(line, "ShipmentID", shipment_id)
             _add(line, "P_ShipmentID", order_number)
@@ -187,7 +205,7 @@ def _build_detail_out(
             _add(line, "codAmount", _fmt_decimal(pkg.get("cod_amount", 0), 4))
             _add(line, "units", pkg.get("units", "LB"))
             _add(line, "packageCost", "0.0")
-            _add(line, "trackingNumber", tracking)
+            _add(line, "trackingNumber", pkg_tracking)
             _add(line, "comment", pkg.get("comment", ""))
     else:
         # Fallback: generate one package from shipment-level data

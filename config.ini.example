@@ -49,6 +49,15 @@ username =
 password =
 odbc_driver = ODBC Driver 17 for SQL Server
 
+; --- UPS API (for multi-package tracking) ---
+; OAuth 2.0 credentials from https://developer.ups.com
+; Only needed if you ship multi-package UPS shipments and want
+; individual tracking numbers per package in the OUT XML.
+[ups]
+client_id = YOUR_UPS_CLIENT_ID
+client_secret = YOUR_UPS_CLIENT_SECRET
+account_number = YOUR_UPS_ACCOUNT_NUMBER
+
 [settings]
 retry_attempts = 3
 retry_delay_seconds = 5

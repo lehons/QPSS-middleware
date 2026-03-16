@@ -35,6 +35,7 @@ from src.shipstation_client import (
     ShipStationTransientError,
 )
 from src.sage_client import SageClient, SageConnectionError, SageQueryError
+from src.ups_client import UPSClient
 
 
 def load_config(config_path: str, dry_run: bool = False) -> configparser.ConfigParser:
@@ -146,6 +147,24 @@ def _build_sage_client(config: configparser.ConfigParser) -> SageClient | None:
         odbc_driver=config.get("sage300", "odbc_driver",
                                fallback="ODBC Driver 17 for SQL Server"),
     )
+
+
+def _build_ups_client(config: configparser.ConfigParser) -> UPSClient | None:
+    """Create a UPSClient from config, or return None if not configured.
+
+    The [ups] section is optional. If absent or missing required fields,
+    multi-package UPS shipments will use the master tracking number on all
+    DetailLines (same as current behavior).
+    """
+    if not config.has_section("ups"):
+        return None
+    client_id = config.get("ups", "client_id", fallback="")
+    client_secret = config.get("ups", "client_secret", fallback="")
+    if not client_id or not client_secret:
+        return None
+    if client_id.startswith("YOUR_") or client_secret.startswith("YOUR_"):
+        return None
+    return UPSClient(client_id=client_id, client_secret=client_secret)
 
 
 def run_list_stores(config: configparser.ConfigParser, account: str = "us") -> None:
@@ -752,11 +771,31 @@ def run_flow2(config: configparser.ConfigParser, dry_run: bool = False) -> None:
                 processed += 1
                 continue
 
+            # Determine if we need per-package UPS tracking
+            package_tracking = []
+            packages = pending.get("packages", [])
+            carrier = shipment.get("carrierCode", "")
+
+            if len(packages) > 1 and carrier.lower().startswith("ups"):
+                ups = _build_ups_client(config)
+                if ups:
+                    master = shipment.get("trackingNumber", "")
+                    package_tracking = ups.get_child_tracking(master)
+                    if len(package_tracking) < len(packages):
+                        logger.warning(
+                            f"{shipment_id} | UPS returned "
+                            f"{len(package_tracking)} tracking number(s) "
+                            f"but expected {len(packages)} — "
+                            "using master tracking for all packages"
+                        )
+                        package_tracking = []  # fall back
+
             # Generate OUT XML files
             header_path, detail_path = generate_out_files(
                 pending=pending,
                 shipment=shipment,
                 out_folder=out_folder,
+                package_tracking=package_tracking or None,
             )
             logger.info(f"{shipment_id} | SUCCESS: Generated OUT files")
             logger.info(f"{shipment_id} |   {os.path.basename(header_path)}")
