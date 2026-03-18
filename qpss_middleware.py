@@ -774,13 +774,12 @@ def run_flow2(config: configparser.ConfigParser, dry_run: bool = False) -> None:
             # Determine if we need per-package UPS tracking
             package_tracking = []
             packages = pending.get("packages", [])
-            carrier = shipment.get("carrierCode", "")
+            tracking = shipment.get("trackingNumber", "")
 
-            if len(packages) > 1 and carrier.lower().startswith("ups"):
+            if len(packages) > 1 and tracking.startswith("1Z"):
                 ups = _build_ups_client(config)
                 if ups:
-                    master = shipment.get("trackingNumber", "")
-                    package_tracking = ups.get_child_tracking(master)
+                    package_tracking = ups.get_child_tracking(tracking)
                     if len(package_tracking) < len(packages):
                         logger.warning(
                             f"{shipment_id} | UPS returned "
