@@ -354,6 +354,7 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
     # Counters
     processed = 0
     skipped = 0
+    duplicates = 0
     errors = 0
     transient_failures = 0
 
@@ -445,12 +446,15 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
             # Check for existing order (duplicate handling)
             existing = client.find_order_by_number(order_number)
             if existing:
-                logger.info(f"{sid} | Order {order_number} already exists — "
-                            "attempting update (may be intentional re-send)")
+                logger.warning(f"{sid} | DUPLICATE: Order {order_number} already "
+                               "exists in ShipStation — skipping "
+                               f"(orderId={existing.get('orderId', '?')})")
+                duplicates += 1
+                continue
 
-            # Create/update order in ShipStation (V1 upserts via orderKey)
+            # Create order in ShipStation (V1 upserts via orderKey)
             result = client.create_or_update_order(order_data)
-            logger.info(f"{sid} | SUCCESS: Order {order_number} created/updated "
+            logger.info(f"{sid} | SUCCESS: Order {order_number} created "
                         f"(orderId={result.get('orderId', '?')})")
             logger.debug(f"{sid} | API response: {json.dumps(result, indent=2)}")
 
@@ -531,12 +535,16 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
                         )
                         existing = client.find_order_by_number(order_number)
                         if existing:
-                            logger.info(f"{hsid} | Order {order_number} already "
-                                        "exists — attempting update")
+                            logger.warning(
+                                f"{hsid} | DUPLICATE: Order {order_number} "
+                                "already exists in ShipStation — skipping "
+                                f"(orderId={existing.get('orderId', '?')})")
+                            duplicates += 1
+                            continue
                         result = client.create_or_update_order(order_data)
                         logger.info(
                             f"{hsid} | SUCCESS (no items): Order {order_number} "
-                            f"created/updated "
+                            f"created "
                             f"(orderId={result.get('orderId', '?')})")
 
                         pending_path = _save_pending_shipment(
@@ -568,6 +576,7 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
     # Summary
     logger.info("-" * 60)
     logger.info(f"SUMMARY: {processed} processed, {skipped} skipped, "
+                f"{duplicates} duplicates, "
                 f"{errors} errors, {transient_failures} left for retry")
     logger.info("-" * 60)
 
