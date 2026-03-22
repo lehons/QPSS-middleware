@@ -315,27 +315,31 @@ def main():
             if lines:
                 st.code("\n".join(_strip_timestamps(lines)), language=None)
 
-            # Auto-refresh while running
-            if running:
+            # Auto-refresh while running.
+            # Check thread.is_alive() *first* — the thread may have
+            # finished between the initial `running` read and now.
+            thread = st.session_state.get("flow_thread")
+            thread_done = thread is not None and not thread.is_alive()
+
+            if thread_done:
+                # Final state update — save last_run, clear running state
+                lines = log_handler.get_lines()
+                flow_key = st.session_state.get("current_flow", "")
+                flow_name = _FLOW_NAMES.get(flow_key, flow_key)
+                summary = _extract_summary(lines) if lines else ""
+
+                st.session_state["last_run"] = {
+                    "flow_name": flow_name,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "summary": summary,
+                    "log_lines": list(lines),
+                }
+                st.session_state["flow_thread"] = None
+                st.session_state["running"] = False
+                st.rerun()
+            elif running:
                 time.sleep(1)
                 st.rerun()
-            else:
-                # Flow just finished — save to last_run
-                thread = st.session_state.get("flow_thread")
-                if thread is not None and not thread.is_alive() and lines:
-                    flow_key = st.session_state.get("current_flow", "")
-                    flow_name = _FLOW_NAMES.get(flow_key, flow_key)
-                    summary = _extract_summary(lines)
-
-                    st.session_state["last_run"] = {
-                        "flow_name": flow_name,
-                        "timestamp": datetime.now().strftime(
-                            "%Y-%m-%d %H:%M"),
-                        "summary": summary,
-                        "log_lines": list(lines),
-                    }
-                    st.session_state["flow_thread"] = None
-                    st.rerun()
 
     # ── 7. Previous Run ───────────────────────────────────────────
     last_run = st.session_state.get("last_run")
