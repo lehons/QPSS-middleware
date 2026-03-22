@@ -307,8 +307,25 @@ def _delete_pending_shipment(pending_folder: str, shipment_id: str) -> None:
 # ─── Flow 1: QuikPAK -> ShipStation ────────────────────────────────
 
 
-def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
+def _default_prompt(message: str, choices: list[str]) -> str:
+    """Default prompt_fn: print message and loop on input() until valid."""
+    print(f"\n{message}")
+    valid = {c.upper() for c in choices}
+    while True:
+        choice = input("    > ").strip().upper()
+        if choice in valid:
+            return choice
+        print(f"    Please enter one of: {', '.join(choices)}")
+
+
+def run_flow1(
+    config: configparser.ConfigParser,
+    dry_run: bool = False,
+    prompt_fn=None,
+) -> None:
     """Execute Flow 1: QuikPAK -> ShipStation order creation."""
+    if prompt_fn is None:
+        prompt_fn = _default_prompt
     logger = setup_logger(config.get("paths", "log_dir"))
 
     logger.info("=" * 60)
@@ -333,16 +350,13 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
             logger.info("Sage 300 DB: connected — items will be included in orders")
         except SageConnectionError as e:
             logger.warning(f"Sage 300 DB unavailable: {e}")
-            print(f"\n*** Sage 300 database connection failed ***")
-            print(f"    Error: {e}")
-            print()
-            while True:
-                choice = input(
-                    "    [C]ontinue without items for all orders, or [A]bort? "
-                ).strip().upper()
-                if choice in ("C", "A"):
-                    break
-                print("    Please enter C or A.")
+            logger.info(f"*** Sage 300 database connection failed ***")
+            logger.info(f"    Error: {e}")
+            choice = prompt_fn(
+                "Sage 300 database connection failed.\n"
+                "[C]ontinue without items for all orders, or [A]bort?",
+                ["C", "A"],
+            )
             if choice == "A":
                 logger.info("User chose to ABORT (Sage 300 unavailable)")
                 print("Aborted.")
@@ -509,14 +523,13 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
 
     # ── Step 3: Handle held orders (no Sage items) ───────────────
     if held_orders:
-        print(f"\n{'=' * 60}")
-        print(f"  {len(held_orders)} order(s) had NO ITEMS from Sage 300:")
-        print(f"{'=' * 60}")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"  {len(held_orders)} order(s) had NO ITEMS from Sage 300:")
+        logger.info(f"{'=' * 60}")
         for pair, header, detail, acct, sid_store, reason in held_orders:
-            print(f"    {header.shipment_id:<20} order={header.order_no:<16} "
-                  f"reason: {reason}")
-        print(f"{'=' * 60}")
-        print()
+            logger.info(f"    {header.shipment_id:<20} order={header.order_no:<16} "
+                        f"reason: {reason}")
+        logger.info(f"{'=' * 60}")
 
         if dry_run:
             logger.info(f"DRY RUN: {len(held_orders)} order(s) held "
@@ -526,22 +539,20 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
                             f"(no items for {header.order_no})")
                 skipped += 1
         else:
-            while True:
-                choice = input(
-                    "    [P]ush all without items, or [S]kip all "
-                    "(leave in QuikPAKIN for retry)? "
-                ).strip().upper()
-                if choice in ("P", "S"):
-                    break
-                print("    Please enter P or S.")
+            choice = prompt_fn(
+                f"{len(held_orders)} order(s) had no items from Sage 300.\n"
+                "[P]ush all without items, or [S]kip all "
+                "(leave in QuikPAKIN for retry)?",
+                ["P", "S"],
+            )
 
             if choice == "S":
                 for pair, header, detail, acct, sid_store, reason in held_orders:
                     logger.info(f"{header.shipment_id} | User chose to SKIP "
                                 f"(no items for {header.order_no})")
                     skipped += 1
-                print(f"\n  Skipped {len(held_orders)} order(s). "
-                      "Files left in QuikPAKIN.\n")
+                logger.info(f"Skipped {len(held_orders)} order(s). "
+                            "Files left in QuikPAKIN.")
             else:
                 # Push all held orders without items
                 for pair, header, detail, acct, sid_store, reason in held_orders:
@@ -590,7 +601,7 @@ def run_flow1(config: configparser.ConfigParser, dry_run: bool = False) -> None:
                                       f"{type(e).__name__}: {e}")
                         errors += 1
 
-                print(f"\n  Pushed {len(held_orders)} order(s) without items.\n")
+                logger.info(f"Pushed {len(held_orders)} order(s) without items.")
 
     # Summary
     logger.info("-" * 60)
@@ -846,7 +857,9 @@ def run_flow2(config: configparser.ConfigParser, dry_run: bool = False) -> None:
 # ─── Cleanup: orphaned pending JSONs ─────────────────────────────────
 
 
-def run_cleanup_pending(config: configparser.ConfigParser, days: int) -> None:
+def run_cleanup_pending(
+    config: configparser.ConfigParser, days: int, prompt_fn=None,
+) -> None:
     """Remove pending JSON files older than N days.
 
     These are orders that Flow 1 pushed to ShipStation but that were never
@@ -856,6 +869,8 @@ def run_cleanup_pending(config: configparser.ConfigParser, days: int) -> None:
     This command lists them, shows their age, and asks for confirmation
     before deleting.
     """
+    if prompt_fn is None:
+        prompt_fn = _default_prompt
     logger = setup_logger(config.get("paths", "log_dir"))
 
     logger.info("=" * 60)
@@ -868,7 +883,7 @@ def run_cleanup_pending(config: configparser.ConfigParser, days: int) -> None:
         pending_folder = os.path.join(script_dir, "QuikPAK", "Pending")
 
     if not os.path.isdir(pending_folder):
-        print(f"Pending folder does not exist: {pending_folder}")
+        logger.info(f"Pending folder does not exist: {pending_folder}")
         return
 
     now = datetime.now()
@@ -903,31 +918,26 @@ def run_cleanup_pending(config: configparser.ConfigParser, days: int) -> None:
             stale.append((fpath, fname, shipment_id, order_no, age_days))
 
     if not stale:
-        print(f"\nNo pending JSONs older than {days} day(s). Nothing to clean up.")
-        logger.info("No stale pending files found.")
+        logger.info(f"No pending JSONs older than {days} day(s). Nothing to clean up.")
         return
 
     # Show what we found
-    print(f"\n{'=' * 70}")
-    print(f"  {len(stale)} pending JSON(s) older than {days} day(s):")
-    print(f"{'=' * 70}")
-    print(f"  {'Shipment ID':<25} {'Order':<18} {'Age':>6}")
-    print(f"  {'-' * 25} {'-' * 18} {'-' * 6}")
+    logger.info(f"{'=' * 70}")
+    logger.info(f"  {len(stale)} pending JSON(s) older than {days} day(s):")
+    logger.info(f"{'=' * 70}")
+    logger.info(f"  {'Shipment ID':<25} {'Order':<18} {'Age':>6}")
+    logger.info(f"  {'-' * 25} {'-' * 18} {'-' * 6}")
     for fpath, fname, sid, order_no, age_days in stale:
-        print(f"  {sid:<25} {order_no:<18} {age_days:>4}d")
-    print(f"{'=' * 70}")
-    print()
+        logger.info(f"  {sid:<25} {order_no:<18} {age_days:>4}d")
+    logger.info(f"{'=' * 70}")
 
-    while True:
-        choice = input(
-            f"  Delete all {len(stale)} file(s)? [Y]es or [N]o? "
-        ).strip().upper()
-        if choice in ("Y", "N"):
-            break
-        print("  Please enter Y or N.")
+    choice = prompt_fn(
+        f"Delete all {len(stale)} stale pending file(s)?\n"
+        "[Y]es or [N]o?",
+        ["Y", "N"],
+    )
 
     if choice == "N":
-        print("  Cancelled. No files deleted.")
         logger.info("User cancelled pending cleanup.")
         return
 
@@ -941,8 +951,7 @@ def run_cleanup_pending(config: configparser.ConfigParser, days: int) -> None:
         except OSError as e:
             logger.error(f"Failed to delete {fname}: {e}")
 
-    print(f"\n  Deleted {deleted} of {len(stale)} file(s).")
-    logger.info(f"Pending cleanup complete: {deleted} file(s) deleted.")
+    logger.info(f"Pending cleanup complete: {deleted} of {len(stale)} file(s) deleted.")
 
 
 # ─── Main ────────────────────────────────────────────────────────────
