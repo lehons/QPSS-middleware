@@ -15,8 +15,10 @@ def setup_logger(log_dir: str) -> logging.Logger:
     logger = logging.getLogger("qpss")
     logger.setLevel(logging.DEBUG)
 
-    # Don't add handlers if they already exist (avoids duplicates on re-import)
-    if logger.handlers:
+    # Don't add handlers if a FileHandler already exists (avoids duplicates on re-import).
+    # Check specifically for FileHandler — Streamlit adds its own handler first, and we
+    # must not skip adding the FileHandler just because Streamlit's handler is present.
+    if any(isinstance(h, logging.FileHandler) for h in logger.handlers):
         return logger
 
     # Daily log file: qpss-YYYY-MM-DD.log
