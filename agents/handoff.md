@@ -6,12 +6,17 @@
 - [x] Implementation complete
 - [x] Review complete (Architect code review passed 2026-03-16)
 - [x] Bug fix: carrier detection (2026-03-18, Architect review passed)
-- [ ] End-to-end test of bug fix on server
-- [x] Streamlit Web UI: initial implementation complete and working
-- [x] Streamlit Web UI: deployed to IS-APP-19, accessible at http://192.168.0.3:8501
-- [ ] Streamlit Web UI: bug fix — flow doesn't return to Ready state when done (requires page refresh)
-- [ ] Streamlit Web UI: layout refinements (spec written, not started)
-- [ ] Streamlit Web UI: Task Scheduler setup (step 4 onward)
+- [x] Merged ups-tracking into main (2026-03-23, fast-forward, pushed to origin)
+- [ ] End-to-end test of multi-package UPS tracking
+- [ ] Bug fix: Streamlit UI not writing log files to disk
+- [ ] Debug UPS child tracking — all packages getting master tracking number
+- [ ] Debug date-related error with specific shipment
+- [x] Streamlit Web UI: initial implementation (f13963a)
+- [x] Streamlit Web UI: deployed to IS-APP-19 at http://192.168.0.3:8501
+- [x] Streamlit Web UI: layout refinements + flow completion bug fix (c105b9c)
+- [x] Streamlit Web UI: pull latest (c105b9c) to IS-APP-19 and restart Streamlit
+- [x] Streamlit Web UI: Task Scheduler setup (confirmed working 2026-03-23)
+- [ ] Streamlit Web UI: hide console window on server (cosmetic, not blocking)
 
 ---
 
@@ -275,6 +280,59 @@ Same auth (OAuth Bearer token), same headers (`transId`, `transactionSrc`). Just
 **Note on Quantum View:** UPS Quantum View exists but is overkill for this use case — it's a bulk event firehose for your entire account. The `/shipment/details/` endpoint is the targeted query we need. No need to go down the Quantum View path.
 
 **Note on UPS data retention:** UPS tracking data is retained for 120 days. SHIP0000446908 is from Jan 7 (~68 days ago) so it should still be available, but keep this in mind for older shipments.
+
+### 2026-03-24 — Bug fix: Streamlit UI not writing log files to disk
+
+**Problem:** When Flow 1, Flow 2, or Cleanup runs through the Streamlit UI, no log file is created on disk. Log lines appear in the Streamlit live output but are never written to `logs/qpss-YYYY-MM-DD.log`. This was discovered on 2026-03-24 when a multi-package UPS tracking failure occurred and there was no log file to diagnose it.
+
+**Root cause:** `src/logger.py` `setup_logger()` line 19 has a guard: `if logger.handlers: return logger`. This prevents adding duplicate handlers on repeated calls. But in the Streamlit path, `app.py` adds a `StreamlitLogHandler` to the `qpss` logger *before* calling `run_flow2()` (or `run_flow1()`). When `run_flow2()` then calls `setup_logger()`, it sees the StreamlitLogHandler and returns early — the `FileHandler` and `StreamHandler` are never added.
+
+**Fix — `src/logger.py`:** Change the guard on line 19 from:
+
+```python
+if logger.handlers:
+    return logger
+```
+
+To:
+
+```python
+if any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+    return logger
+```
+
+This checks specifically for a `FileHandler` instead of any handler. Effect:
+- **CLI path (unchanged):** No handlers exist → adds FileHandler + StreamHandler as before.
+- **Streamlit path (fixed):** StreamlitLogHandler exists but no FileHandler → adds FileHandler + StreamHandler. Log lines now go to both the UI and disk.
+- **Repeated calls (unchanged):** FileHandler already exists → skips, no duplicates.
+
+**One file changed:** `src/logger.py` — one line.
+
+**How to verify:** Run Flow 2 (dry run is fine) through the Streamlit UI on IS-APP-19. Check `C:\QPSS-middleware\logs\` — a `qpss-2026-03-24.log` file should exist. Then run the same flow from the CLI batch file — confirm it still writes to the same log file without errors.
+
+**After deploying this fix:** Re-run Flow 2 (not dry run) through the Streamlit UI so the next multi-package UPS shipment produces a log file. That log will tell us exactly why child tracking numbers are not being assigned — whether the UPS client is not being called, the API is returning warnings that trigger the early-exit path, or there's a count mismatch. Do NOT attempt to fix the UPS tracking bug until we have log data.
+
+### 2026-03-24 — UPS child tracking still broken (pending diagnosis)
+
+**Symptom:** SHIP0000448306 (3-package UPS shipment, 2026-03-24):
+- Box 1 tracking: `1Z88XW192094472336` (correct — this is the master)
+- Box 2 tracking: `1Z88XW192094472336` (wrong — should be `1Z88XW192093919347`)
+- Box 3 tracking: `1Z88XW192094472336` (wrong — should be `1Z88XW192092306555`)
+
+All three boxes got the master tracking number. The per-package child tracking numbers exist in UPS but were not assigned.
+
+**This was the first run through the Streamlit UI**, and also the first real end-to-end test of multi-package UPS tracking since the carrier detection fix (2026-03-18) was merged to main.
+
+**No log file exists** for this run (see logging bug above). We cannot determine the root cause without logs.
+
+**Top hypothesis:** `ups_client.py` lines 86–91 — the `warnings` check returns `[]` immediately if the UPS API response contains *any* warning, even informational ones that accompany valid package data. This would cause the fallback to master tracking on all packages. But this is unconfirmed.
+
+**Other possibilities:**
+1. `_build_ups_client()` returning `None` (config issue — less likely since credentials were verified)
+2. Count mismatch between UPS response and pending JSON package count
+3. UPS API returning all packages with the master tracking number (least likely — user confirmed correct child numbers exist)
+
+**Action:** Fix the logging bug first. Deploy to server. Run Flow 2 again. Read the log. Then we diagnose and fix the tracking bug based on actual data.
 
 ---
 
@@ -636,10 +694,12 @@ The Coder should test this by running Flow 2 with dry run (fast, no prompts) and
 
 **Server:** IS-APP-19 at `192.168.0.3`
 
-**Current state:**
-- Streamlit is running from an interactive PowerShell window on the server (via RDP). This is temporary — will be replaced by Task Scheduler.
+**Current state (2026-03-23):**
+- `ups-tracking` merged into `main` (fast-forward). Server is on `main`.
+- Streamlit running via Task Scheduler (`QPSS Streamlit UI` task) on IS-APP-19.
 - Accessible at `http://IS-APP-19:8501` or `http://192.168.0.3:8501` from LAN.
-- Flows are functional but have the "doesn't stop" bug above and need layout refinements.
+- Task Scheduler configured as "Run only when user is logged on" + trigger "At log on" for SRV_APP (needed for Tornado event loop — "Run whether user is logged on or not" causes `RuntimeError: Event loop is closed`).
+- **Known issue:** A console window remains visible on the server desktop even with the Task Scheduler "Hidden" checkbox enabled. Not user-facing (only visible via RDP), but should be addressed. Options to investigate: NSSM (run as a Windows service), a VBS wrapper to launch the batch file hidden, or `pythonw.exe` instead of `python.exe`.
 
 **Environment:**
 - No `.venv` — everything is installed in the system Python (`C:\Users\SRV_APP\AppData\Roaming\Python\Python314\`)
@@ -665,9 +725,10 @@ On IS-APP-19, open **Task Scheduler** and create a new task:
   - New trigger → "At startup"
 - **Actions tab:**
   - Action: Start a program
-  - Program: `streamlit`
-  - Arguments: `run C:\QPSS-middleware\app.py --server.address 0.0.0.0 --server.port 8501`
+  - Program: `C:\Progra~1\Python314\python.exe`
+  - Arguments: `-m streamlit run C:\QPSS-middleware\app.py --server.address 0.0.0.0 --server.port 8501`
   - Start in: `C:\QPSS-middleware`
+  - Note: Must use the short path `Progra~1` to avoid spaces in "Program Files" — Task Scheduler doesn't handle quoted paths in the Program field.
 - **Settings tab:**
   - Check "If the task fails, restart every 1 minute"
   - Attempt restart up to 3 times
@@ -680,3 +741,26 @@ Click OK. Enter the service account credentials when prompted.
 #### Step 5 — Verify and close the RDP PowerShell window
 
 Once Task Scheduler is confirmed working, close the temporary PowerShell window that's currently running Streamlit.
+
+### 2026-03-22 — Streamlit UI refinements + bug fix (commits f13963a + c105b9c)
+
+**Initial implementation (f13963a):**
+- `app.py` — NEW: Streamlit entry point
+- `src/ui_bridge.py` — NEW: StreamlitLogHandler + StreamlitPromptBridge (thread-safe log capture and prompt/response handshake)
+- `.streamlit/config.toml` — NEW (initially had hideDeployButton, later emptied)
+- `qpss_middleware.py` — Added `prompt_fn` parameter to `run_flow1()` and `run_cleanup_pending()`, replaced 3 `input()` calls, converted `print()` banners to `logger.info()`
+- `requirements.txt` — Added `streamlit>=1.30.0`
+
+**Layout refinements + bug fix (c105b9c):**
+- Status banner: Ready / Running / Done (success) / Finished with errors
+- Friendly button labels: "Send Orders to ShipStation", "Get Tracking from ShipStation"
+- `st.caption()` descriptions under each button and dry-run checkbox
+- Prompt letter codes mapped to full-word labels (C → "Continue without items", etc.)
+- Timestamps stripped from log display (full log still on disk)
+- Left/right column layout with bordered containers
+- Previous Run section with collapsible full log, above Pending Files
+- Pending Files in collapsible `st.expander()` with count in label
+- **Bug fix:** Flow completion race condition — now checks `thread.is_alive()` before the `running` flag so the final state update + rerun always fires
+- Removed deprecated `hideDeployButton` from `.streamlit/config.toml` (removed in Streamlit 1.55.0)
+
+**Confirmed working** on IS-APP-19 (2026-03-22). Human verified flow runs and returns to Ready state without manual refresh.
